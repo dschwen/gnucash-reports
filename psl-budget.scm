@@ -9,462 +9,666 @@
 (use-modules (gnucash gnc-module))
 (use-modules (gnucash gettext))
 
-;; 'debug is deprecated and unused since guile 2
-(cond-expand
-  (guile-2 )
-  (else
-    (debug-enable 'debug)))
-(debug-enable 'backtrace)
+(define reportname (N_ "YTD Budget Report"))
 
-(gnc:module-load "gnucash/report/report-system" 0)
-(gnc:module-load "gnucash/html" 0) ;for gnc-build-url
+;; define all option's names so that they are properly defined
+;; in *one* place.
+;;(define optname-from-date (N_ "From"))
+;;(define optname-to-date (N_ "To"))
 
-;; This function will generate a set of options that GnuCash
-;; will use to display a dialog where the user can select
-;; values for your report's parameters.
+(define optname-display-depth (N_ "Account Display Depth"))
+(define optname-show-subaccounts (N_ "Always show sub-accounts"))
+(define optname-accounts (N_ "Account"))
+
+(define optname-period (N_ "Budget Period Number"))
+(define optname-price-source (N_ "Price Source"))
+(define optname-show-rates (N_ "Show Exchange Rates"))
+(define optname-show-full-names (N_ "Show Full Account Names"))
+(define optname-select-columns (N_ "Select Columns"))
+(define optname-show-budget (N_ "Show Budget"))
+(define optname-show-actual (N_ "Show Actual"))
+(define optname-show-difference (N_ "Show Difference"))
+(define opthelp-show-budget (N_ "Display a column for the budget values"))
+(define opthelp-show-actual (N_ "Display a column for the actual values"))
+(define opthelp-show-difference (N_ "Display the difference as budget - actual"))
+(define optname-show-totalcol (N_ "Show Column with Totals"))
+(define opthelp-show-totalcol (N_ "Display a column with the row totals"))
+(define optname-bottom-behavior (N_ "Flatten list to depth limit"))
+(define opthelp-bottom-behavior
+  (N_ "Displays accounts which exceed the depth limit at the depth limit"))
+
+(define optname-budget (N_ "Budget"))
+
+;; options generator
 (define (options-generator)
   (let* ((options (gnc:new-options))
-         ;; This is just a helper function for making options.
-         ;; See gnucash/src/app-utils/options.scm for details.
-         (add-option
-          (lambda (new-option)
-            (gnc:register-option options new-option))))
-
-    ;; This is a boolean option. It is in Section 'Hello, World!'
-    ;; and is named 'Boolean Option'. Its sorting key is 'a',
-    ;; thus it will come before options with sorting keys
-    ;; 'b', 'c', etc. in the same section. The default value
-    ;; is #t (true). The phrase 'This is a boolean option'
-    ;; will be displayed as help text when the user puts
-    ;; the mouse pointer over the option.
     (add-option
+     (lambda (new-option)
+       (gnc:register-option options new-option))))
+
+    (gnc:register-option
+     options
+     (gnc:make-budget-option
+      gnc:pagename-general optname-budget
+      "a" (N_ "Budget")))
+
+    ;; date interval
+    ;;(gnc:options-add-date-interval!
+    ;; options gnc:pagename-general
+    ;; optname-from-date optname-to-date "a")
+
+    (gnc:options-add-price-source!
+     options gnc:pagename-general optname-price-source "c" 'average-cost)
+
+    ;;(gnc:register-option
+    ;; options
+    ;; (gnc:make-simple-boolean-option
+    ;;  gnc:pagename-general optname-show-rates
+    ;;  "d" (N_ "Show the exchange rates used") #f))
+
+    (gnc:register-option
+     options
      (gnc:make-simple-boolean-option
-      (N_ "Hello, World!") (N_ "Boolean Option")
-      "a" (N_ "This is a boolean option.") #t))
+      gnc:pagename-general optname-show-full-names
+      "e" (N_ "Show full account names (including parent accounts)") #t))
 
-    ;; This is a multichoice option. The user can choose between
-    ;; the values 'first, 'second, 'third, or 'fourth. These are guile
-    ;; symbols. The value 'first will be displayed as "First Option"
-    ;; and have a help string of "Help for first option.". The default
-    ;; value is 'third.
-    (add-option
-     (gnc:make-multichoice-option
-      (N_ "Hello, World!") (N_ "Multi Choice Option")
-      "b" (N_ "This is a multi choice option.") 'third
-      (list (list->vector
-             (list 'first
-                   (N_ "First Option")
-                   (N_ "Help for first option.")))
-            (list->vector
-             (list 'second
-                   (N_ "Second Option")
-                   (N_ "Help for second option.")))
-            (list->vector
-             (list 'third
-                   (N_ "Third Option")
-                   (N_ "Help for third option.")))
-            (list->vector
-             (list 'fourth
-                   (N_ "Fourth Options")
-                   (N_ "The fourth option rules!"))))))
-
-    ;; This is a string option. Users can type anything they want
-    ;; as a value. The default value is "Hello, World". This is
-    ;; in the same section as the option above. It will be shown
-    ;; after the option above because its key is 'b' while the
-    ;; other key is 'a'.
-    (add-option
-     (gnc:make-string-option
-      (N_ "Hello, World!") (N_ "String Option")
-      "c" (N_ "This is a string option.") (N_ "Hello, World")))
-
-    ;; This is a date/time option. The user can pick a date and,
-    ;; possibly, a time. Times are stored as a pair
-    ;; (seconds . nanoseconds) measured from Jan 1, 1970, i.e.,
-    ;; Unix time. The last option is false, so the user can only
-    ;; select a date, not a time. The default value is the current
-    ;; time.
-    (add-option
-     (gnc:make-date-option
-      (N_ "Hello, World!") (N_ "Just a Date Option")
-      "d" (N_ "This is a date option.")
-      (lambda () (cons 'absolute (cons (current-time) 0)))
-      #f 'absolute #f ))
-
-    ;; This is another date option, but the user can also select
-    ;; the time.
-    (add-option
-     (gnc:make-date-option
-      (N_ "Hello, World!") (N_ "Time and Date Option")
-      "e" (N_ "This is a date option with time.")
-      (lambda () (cons 'absolute (cons (current-time) 0)))
-      #t 'absolute #f ))
-
-    (add-option
-     (gnc:make-date-option
-      (N_ "Hello, World!") (N_ "Combo Date Option")
-      "y" (N_ "This is a combination date option.")
-      (lambda () (cons 'relative 'start-cal-year))
-      #f 'both '(start-cal-year start-prev-year end-prev-year) ))
-
-    (add-option
-     (gnc:make-date-option
-      (N_ "Hello, World!") (N_ "Relative Date Option")
-      "x" (N_ "This is a relative date option.")
-      (lambda () (cons 'relative 'start-cal-year))
-      #f 'relative '(start-cal-year start-prev-year end-prev-year) ))
-
-    ;; This is a number range option. The user can enter a number
-    ;; between a lower and upper bound given below. There are also
-    ;; arrows the user can click to go up or down, the amount changed
-    ;; by a single click is given by the step size.
-    (add-option
+    (gnc:register-option
+     options
      (gnc:make-number-range-option
-      (N_ "Hello, World!") (N_ "Number Option")
-      "ee" (N_ "This is a number option.")
-      1500.0  ;; default
-      0.0     ;; lower bound
-      10000.0 ;; upper bound
-      2.0     ;; number of decimals
-      0.01    ;; step size
-      ))
+      gnc:pagename-general optname-period
+      "e" (N_ "The budget period to use") 9
+      1 12 0 1))
 
-    ;; This is a color option, defined by rgba values. A color value
-    ;; is a list where the elements are the red, green, blue, and
-    ;; alpha channel values respectively. The penultimate argument
-    ;; (255) is the allowed range of rgba values. The final argument
-    ;; (#f) indicates the alpha value should be ignored. You can get
-    ;; a color string from a color option with gnc:color-option->html,
-    ;; which will scale the values appropriately according the range.
-    (add-option
-     (gnc:make-color-option
-      (N_ "Hello, World!") (N_ "Background Color")
-      "f" (N_ "This is a color option.")
-      (list #xf6 #xff #xdb 0)
-      255
-      #f))
-    (add-option
-     (gnc:make-color-option
-      (N_ "Hello, World!") (N_ "Text Color")
-      "f" (N_ "This is a color option.")
-      (list #x00 #x00 #x00 0)
-      255
-      #f))
-
-    ;; This is an account list option. The user can select one
-    ;; or (possibly) more accounts from the list of accounts
-    ;; in the current file. Values are scheme handles to actual
-    ;; C pointers to accounts.
-    ;; The #f value indicates that any account will be accepted.
-    ;; Instead of a #f values, you could provide a function that
-    ;; accepts a list of account values and returns a pair. If
-    ;; the first element is #t, the second element is the list
-    ;; of accounts actually accepted. If the first element is
-    ;; #f, the accounts are rejected and the second element is
-    ;; and error string. The last argument is #t which means
-    ;; the user is allowed to select more than one account.
-    ;; The default value for this option is the currently
-    ;; selected account in the main window, if any.
-    (add-option
-     (gnc:make-account-list-option
-      (N_ "Hello Again") (N_ "An account list option")
-      "g" (N_ "This is an account list option.")
-      ;; FIXME : this used to be gnc:get-current-accounts, but
-      ;; that doesn't exist any more.
-      (lambda () '())
-      #f #t))
-
-    ;; This is a list option. The user can select one or (possibly)
-    ;; more values from a list. The list of acceptable values is
-    ;; the same format as a multichoice option. The value of the
-    ;; option is a list of symbols.
-    (add-option
-     (gnc:make-list-option
-      (N_ "Hello Again") (N_ "A list option")
-      "h" (N_ "This is a list option.")
-      (list 'good)
-      (list (list->vector
-             (list 'good
-                   (N_ "The Good")
-                   (N_ "Good option.")))
-            (list->vector
-             (list 'bad
-                   (N_ "The Bad")
-                   (N_ "Bad option.")))
-            (list->vector
-             (list 'ugly
-                   (N_ "The Ugly")
-                   (N_ "Ugly option."))))))
-
-    ;; This option is for testing. When true, the report generates
-    ;; an exception.
+    ;; accounts to work on
+    (gnc:options-add-account-selection!
+     options gnc:pagename-accounts
+     optname-display-depth optname-show-subaccounts
+     optname-accounts "a" 2
+     (lambda ()
+       (gnc:filter-accountlist-type
+        (list ACCT-TYPE-ASSET ACCT-TYPE-LIABILITY ACCT-TYPE-INCOME
+                          ACCT-TYPE-EXPENSE)
+        (gnc-account-get-descendants-sorted (gnc-get-current-root-account))))
+     #f)
     (add-option
      (gnc:make-simple-boolean-option
-      (N_ "Testing") (N_ "Crash the report")
-      "a"
-      (N_ "This is for testing. \
-Your reports probably shouldn't have an \
-option like this.")
-      #f))
+      gnc:pagename-accounts optname-bottom-behavior
+      "c" opthelp-bottom-behavior #f))
 
-    (gnc:options-set-default-section options "Hello, World!")
-    options))
+    ;; columns to display
+    (add-option
+     (gnc:make-simple-boolean-option
+      gnc:pagename-display optname-show-budget
+      "s1" opthelp-show-budget #t))
+    (add-option
+     (gnc:make-simple-boolean-option
+      gnc:pagename-display optname-show-actual
+      "s2" opthelp-show-actual #t))
+    (add-option
+     (gnc:make-simple-boolean-option
+      gnc:pagename-display optname-show-difference
+      "s3" opthelp-show-difference #f))
+    (add-option
+     (gnc:make-simple-boolean-option
+      gnc:pagename-display optname-show-totalcol
+      "s4" opthelp-show-totalcol #f))
 
-;; This is the rendering function. It accepts a database of options
-;; and generates an object of type <html-document>.  See the file
-;; report-html.txt for documentation; the file report-html.scm
-;; includes all the relevant Scheme code. The option database passed
-;; to the function is one created by the options-generator function
-;; defined above.
-(define (hello-world-renderer report-obj)
-  ;; These are some helper functions for looking up option values.
-  (define (get-op section name)
-    (gnc:lookup-option (gnc:report-options report-obj) section name))
+      ;; Set the general page as default option tab
+    (gnc:options-set-default-section options gnc:pagename-general)
 
-  (define (op-value section name)
-    (gnc:option-value (get-op section name)))
+    options)
+  )
 
-  ;; The first thing we do is make local variables for all the specific
-  ;; options in the set of options given to the function. This set will
-  ;; be generated by the options generator above.
-  (let ((bool-val     (op-value "Hello, World!" "Boolean Option"))
-        (mult-val     (op-value "Hello, World!" "Multi Choice Option"))
-        (string-val   (op-value "Hello, World!" "String Option"))
-        (date-val     (gnc:date-option-absolute-time
-                       (op-value "Hello, World!" "Just a Date Option")))
-        (date2-val    (gnc:date-option-absolute-time
-                       (op-value "Hello, World!" "Time and Date Option")))
-        (rel-date-val (gnc:date-option-absolute-time
-                       (op-value "Hello, World!" "Relative Date Option")))
-        (combo-date-val (gnc:date-option-absolute-time
-                         (op-value "Hello, World!" "Combo Date Option")))
-        (num-val      (op-value "Hello, World!" "Number Option"))
-        (bg-color-op  (get-op   "Hello, World!" "Background Color"))
-        (txt-color-op (get-op   "Hello, World!" "Text Color"))
-        (accounts     (op-value "Hello Again"   "An account list option"))
-        (list-val     (op-value "Hello Again"   "A list option"))
-        (crash-val    (op-value "Testing"       "Crash the report"))
+;; Create the html table for the budget report
+;;
+;; Parameters
+;;   html-table - HTML table to fill in
+;;   acct-table - Table of accounts to use
+;;   budget - budget to use
+;;   params - report parameters
+(define (gnc:html-table-add-budget-values!
+         html-table acct-table budget params)
+  (let* ((get-val (lambda (alist key)
+                    (let ((lst (assoc-ref alist key)))
+                      (if lst (car lst) lst))))
+         (show-actual? (get-val params 'show-actual))
+         (show-budget? (get-val params 'show-budget))
+         (show-diff? (get-val params 'show-difference))
+         (show-totalcol? (get-val params 'show-totalcol))
+         (budget-period-num (get-val params 'period-number))
+        )
 
-        ;; document will be the HTML document that we return.
-        (document (gnc:make-html-document)))
+  ;; Calculate the sum of all budgets of all children of an account for a specific period
+  ;;
+  ;; Parameters:
+  ;;   budget - budget to use
+  ;;   children - list of children
+  ;;   period - budget period to use
+  ;;
+  ;; Return value:
+  ;;   budget value to use for account for specified period.
+  (define (budget-account-sum budget children period)
+	(let* ((sum (cond
+                   ((null? children) (gnc-numeric-zero))
+                   (else (gnc-numeric-add (gnc:get-account-period-budget-value budget (car children) period)
+                             (budget-account-sum budget (cdr children) period)
+			     GNC-DENOM-AUTO GNC-RND-ROUND))
+                 )
+		  ))
+	sum)
+  )
 
-    ;; Crash if asked to.
-    (if crash-val (string-length #f)) ;; string-length needs a string
+  ;; Calculate the value to use for the budget of an account for a specific period.
+  ;; 1) If the account has a budget value set for the period, use it
+  ;; 2) If the account has children, use the sum of budget values for the children
+  ;; 3) Otherwise, use 0.
+  ;;
+  ;; Parameters:
+  ;;   budget - budget to use
+  ;;   acct - account
+  ;;   period - budget period to use
+  ;;
+  ;; Return value:
+  ;;   sum of all budgets for list of children for specified period.
+  (define (gnc:get-account-period-budget-value budget acct period)
+    (let* ((bgt-set? (gnc-budget-is-account-period-value-set budget acct period))
+          (children (gnc-account-get-children acct))
+          (amount (cond
+                    (bgt-set? (gnc-budget-get-account-period-value budget acct period))
+		    ((not (null? children)) (budget-account-sum budget children period))
+		    (else (gnc-numeric-zero)))
+          ))
+    amount)
+  )
 
-    ;; these are samples of different date options. for a simple
-    ;; date with day, month, and year but no time you should use
-    ;; gnc-print-date
-    (let ((time-string (strftime "%X" (localtime (current-time))))
-          (date-string (strftime "%x" (localtime (car date-val))))
-          (date-string2 (strftime "%x %X" (localtime (car date2-val))))
-          (rel-date-string (strftime "%x" (localtime (car rel-date-val))))
-          (combo-date-string
-           (strftime "%x" (localtime (car combo-date-val)))))
+  ;; Calculate the value to use for the budget of an account for a specific set of periods.
+  ;; If there is 1 period, use that period's budget value.  Otherwise, sum the budgets for
+  ;; all of the periods.
+  ;;
+  ;; Parameters:
+  ;;   budget - budget to use
+  ;;   acct - account
+  ;;   periodlist - list of budget periods to use
+  ;;
+  ;; Return value:
+  ;;   Budget sum
+  (define (gnc:get-account-periodlist-budget-value budget acct periodlist)
+(gnc:debug "gnc:get-account-periodlist-budget-value " periodlist)
+    (cond
+	  ((= (length periodlist) 1)(gnc:get-account-period-budget-value budget acct (car periodlist)))
+	  (else (gnc-numeric-add (gnc:get-account-period-budget-value budget acct (car periodlist))
+	                         (gnc:get-account-periodlist-budget-value budget acct (cdr periodlist))
+							 GNC-DENOM-AUTO GNC-RND-ROUND))
+	)
+  )
 
-      ;; Here's where we fill the report document with content.  We
-      ;; do this by adding 'html objects' such as text, tables, and
-      ;; graphs to the html document we already created.
+  ;; Calculate the value to use for the actual of an account for a specific set of periods.
+  ;; This is the sum of the actuals for each of the periods.
+  ;;
+  ;; Parameters:
+  ;;   budget - budget to use
+  ;;   acct - account
+  ;;   periodlist - list of budget periods to use
+  ;;
+  ;; Return value:
+  ;;   Budget sum
+  (define (gnc:get-account-periodlist-actual-value budget acct periodlist)
+(gnc:debug "gnc:get-account-periodlist-actual-value " periodlist)
+    (cond
+	  ((= (length periodlist) 1)(gnc-budget-get-account-period-actual-value budget acct (car periodlist)))
+	  (else (gnc-numeric-add (gnc-budget-get-account-period-actual-value budget acct (car periodlist))
+	                         (gnc:get-account-periodlist-actual-value budget acct (cdr periodlist))
+							 GNC-DENOM-AUTO GNC-RND-ROUND))
+	)
+  )
 
-      ;; the report's style sheet (an "invisible" option that every
-      ;; report has) will usually set the default background color,
-      ;; but we can override that here.  You set background color in
-      ;; HTML by specifying the "bgcolor" attribute for the <body>
-      ;; tag.
+  ;; Adds a line to tbe budget report.  The line contains a number of columns, controlled by the
+  ;; column-list parameter.  Each element of the list can be:
+  ;;   1) a period number - this column contains info for the specific period
+  ;;   2) a list of period numbers - this column contains the sum of info for the periods
+  ;;   3) 'total - this column contains the total of columns to the left
+  ;;
+  ;; Parameters:
+  ;;   html-table - html table being created
+  ;;   rownum - row number
+  ;;   colnum - starting column number
+  ;;   budget - budget to use
+  ;;   acct - account being displayed
+  ;;   column-list - list of column info
+  ;;   exchange-fn - exchange function (not used)
+  (define (gnc:html-table-add-budget-line!
+           html-table rownum colnum
+           budget acct column-list exchange-fn)
+    (let* ((num-periods (gnc-budget-get-num-periods budget))
+           (period 0)
+           (current-col (+ colnum 1))
+		   (bgt-total (gnc-numeric-zero))
+		   (bgt-total-unset? #t)
+		   (act-total (gnc-numeric-zero))
+           (comm (xaccAccountGetCommodity acct))
+           (reverse-balance? (gnc-reverse-balance acct))
+           )
 
-      ;; every HTML object has "styles" for markup and data.  the
-      ;; style for an HTML tag such as "body" tells the HTML
-      ;; document how to render the markup and content for tagged
-      ;; elements.  For each tag, you can specify a font-face,
-      ;; font-color, and font-size to render the contents of the
-      ;; element, and any number of attributes to put in the
-      ;; start-tag.  You can pass 'inheritable? #f if you wish the
-      ;; style to apply only to markup in the object itself and not
-      ;; to its components.  You can also override the tag itself if
-      ;; you want to create your own custom markup (see
-      ;; documentation).
-
-      ;; in this case, we are saying "every time you see <body>
-      ;; markup anywhere in 'document' or its components, add the
-      ;; attribute "bgcolor=0xXXXXXX" in the start tag, and enclose
-      ;; the content in a <font> block to set the font color".
-      ;; Altogether, we get
+      ;; Determines if this is an income or asset account
       ;;
-      ;; <body bgcolor=0xXXXXXXX>
-      ;; <font color="0xXXXXXX"> (body) </font>
-      ;; </body>
+      ;; Parameters
+      ;;   account - Account
+      (define (gnc:account-is-inc-asset? account)
+        (let ((type (xaccAccountGetType account)))
+          (member type (list ACCT-TYPE-INCOME ACCT-TYPE-ASSET))))
 
-      ;; of course if a component object explicitly selects a
-      ;; different font that will override the body font.
 
-      (gnc:html-document-set-style!
-       document "body"
-       'attribute (list "bgcolor" (gnc:color-option->html bg-color-op))
-       'font-color (gnc:color-option->html txt-color-op))
+	  ;; Displays a set of budget column values.  The execution
+      ;; environment must include show-budget? show-actual? and
+      ;; show-diff? to indicate which columns in the set should
+      ;; be shown.
+	  ;;
+	  ;; Parameters
+      ;;   html-table - html table being created
+      ;;   rownum - row number
+      ;;   acct - account
+	  ;;   bgt-numeric-val - budget value
+	  ;;   act-numeric-val - actual value
+	  ;;   dif-numeric val - difference value
+	  (define (gnc:html-table-display-budget-columns!
+	           html-table rownum acct
+			   bgt-numeric-val act-numeric-val dif-numeric-val)
 
-      ;; the title of the report will be rendered by the
-      ;; selected style sheet.  All we have to do is set it in the
-      ;; HTML document.
+           (let* (
+              (bgt-val #f)
+              (act-val #f)
+              (dif-val #f)
+              (style-tag "number-cell")
+              (inc-asset? (gnc:account-is-inc-asset? acct))
+              (style-tag-neg (string-append style-tag "-neg"))
 
-      ;; Note we invoke the _ function upon this string.
-      ;; The _ function works the same way as in C -- if a
-      ;; translation of the given string is available for the
-      ;; current locale, then the translation is returned,
-      ;; otherwise the original string is returned.
-      (gnc:html-document-set-title! document (_ "Hello, World"))
+			)
+           (if show-budget?
+             (begin
+               (set! bgt-val (if (gnc-numeric-zero-p bgt-numeric-val)
+                                 "."
+                                 (gnc:make-gnc-monetary comm bgt-numeric-val)))
+               (gnc:html-table-set-cell/tag!
+                html-table rownum current-col style-tag bgt-val)
+               (set! current-col (+ current-col 1))
+             )
+           )
+           (if show-actual?
+             (begin
+               (set! act-val (gnc:make-gnc-monetary comm act-numeric-val))
+               (gnc:html-table-set-cell/tag!
+                 html-table rownum current-col
+                 (if (gnc-numeric-negative-p act-numeric-val) style-tag-neg style-tag)
+                 act-val)
+               (set! current-col (+ current-col 1))
+             )
+           )
 
-      ;; we make a "text object" to add a bunch of text to.
-      ;; the function gnc:make-html-text can take any number of
-      ;; arguments.  The gnc:html-markup functions are designed
-      ;; to work with the style system so that you can control
-      ;; the appearance of the report from the Gnucash UI; you
-      ;; should use the HTML markup functions whenever possible
-      ;; rather than including literal HTML in your report.
+           ;; For the diff column, "good" values are shown in black, even if -ve and
+           ;; "bad" values are shown in red, even if +ve.
+           (if show-diff?
+             (begin
+               (set! dif-val
+                 (if (and (gnc-numeric-zero-p bgt-numeric-val) (gnc-numeric-zero-p act-numeric-val))
+                     "."
+                     (gnc:make-gnc-monetary comm dif-numeric-val)))
+                 (gnc:html-table-set-cell/tag!
+                   html-table rownum current-col
+                   (cond
+                     (inc-asset?
+                       (if (gnc-numeric-negative-p dif-numeric-val) style-tag style-tag-neg))
+                     (else
+                       (if (gnc-numeric-negative-p dif-numeric-val) style-tag-neg style-tag))
+                   )
+                   dif-val)
+               (set! current-col (+ current-col 1))
+             )
+           )
+		  )
+		)
 
-      (gnc:html-document-add-object!
-       document
-       (gnc:make-html-text
-        (gnc:html-markup-p
-         (gnc:html-markup/format
-          (_ "This is a sample GnuCash report. \
-See the guile (scheme) source code in the scm/report directory \
-for details on writing your own reports, \
-or extending existing reports.")))
-        (gnc:html-markup-p
-         (gnc:html-markup/format
-          (_ "For help on writing reports, or to contribute your brand \
-new, totally cool report, consult the mailing list %s.")
-          (gnc:html-markup-anchor
-           "mailto:gnucash-devel@gnucash.org"
-           (gnc:html-markup-tt "gnucash-devel@gnucash.org")))
-         (_ "For details on subscribing to that list, see &lt;http://www.gnucash.org/&gt;.")
-         (_ "You can learn more about writing scheme at &lt;http://www.scheme.com/tspl2d/&gt;."))
+	  ;; Adds a set of column values to the budget report for a specific list
+	  ;; of periods.
+	  ;;
+	  ;; Parameters:
+      ;;   html-table - html table being created
+      ;;   rownum - row number
+      ;;   budget - budget to use
+      ;;   acct - account being displayed
+	  ;;   period-list - list of periods to use
+      (define (gnc:html-table-add-budget-line-columns!
+	  			html-table rownum
+				budget acct period-list)
+             (let* (
+                    ;; budgeted amount
+                    (bgt-numeric-val (gnc:get-account-periodlist-budget-value
+                                  budget acct period-list))
 
-        (gnc:html-markup-p
-         (gnc:html-markup/format
-          (_ "The current time is %s.")
-          (gnc:html-markup-b time-string)))
+                    ;; actual amount
+                    (act-numeric-abs (gnc:get-account-periodlist-actual-value
+                                  budget acct period-list))
+                    (act-numeric-val (if reverse-balance?
+                         (gnc-numeric-neg act-numeric-abs)
+                         act-numeric-abs))
 
-        (gnc:html-markup-p
-         (gnc:html-markup/format
-          (_ "The boolean option is %s.")
-          (gnc:html-markup-b (if bool-val (_ "true") (_ "false")))))
+                    ;; difference (budget to actual)
+                    (dif-numeric-val (gnc-numeric-sub bgt-numeric-val
+                                 act-numeric-val GNC-DENOM-AUTO
+                                 (+ GNC-DENOM-LCD GNC-RND-NEVER)))
+                    )
 
-        (gnc:html-markup-p
-         (gnc:html-markup/format
-          (_ "The multi-choice option is %s.")
-          (gnc:html-markup-b (symbol->string mult-val))))
+			   (if (not (gnc-numeric-zero-p bgt-numeric-val))
+			     (begin
+			   		(set! bgt-total (gnc-numeric-add bgt-total bgt-numeric-val GNC-DENOM-AUTO GNC-RND-ROUND))
+					(set! bgt-total-unset? #f))
+				 )
+			   (set! act-total (gnc-numeric-add act-total act-numeric-val GNC-DENOM-AUTO GNC-RND-ROUND))
+	           (gnc:html-table-display-budget-columns!
+	               html-table rownum acct
+			       bgt-numeric-val act-numeric-val dif-numeric-val)
+             )
+      )
 
-        (gnc:html-markup-p
-         (gnc:html-markup/format
-          (_ "The string option is %s.")
-          (gnc:html-markup-b string-val)))
+      (while (not (null? column-list))
+	    (let* ((col-info (car column-list)))
+		  (cond
+		    ((equal? col-info '(quote total))
+	           (gnc:html-table-display-budget-columns!
+	               html-table rownum acct
+		           bgt-total act-total
+                   (gnc-numeric-sub bgt-total
+                      act-total GNC-DENOM-AUTO
+                      (+ GNC-DENOM-LCD GNC-RND-NEVER)
+                   )
+	            ))
+		    ((list? col-info)
+                (gnc:html-table-add-budget-line-columns!
+	  		      	html-table rownum
+				      budget acct col-info))
+		    (else
+                (gnc:html-table-add-budget-line-columns!
+	  		      	html-table rownum
+				      budget acct (list col-info)))
+		    )
+	      (set! column-list (cdr column-list))
+		)
+     )
+    )
+  )
 
-        (gnc:html-markup-p
-         (gnc:html-markup/format
-          (_ "The date option is %s.")
-          (gnc:html-markup-b date-string)))
+  ;; Adds header rows to the budget report.  The columns are specified by the
+  ;; column-list parameter.
+  ;;
+  ;; Parameters:
+  ;;   html-table - html table being created
+  ;;   colnum - starting column number
+  ;;   budget - budget to use
+  ;;   column-list - column info list
+  (define (gnc:html-table-add-budget-headers!
+           html-table colnum budget column-list)
+    (let* ((current-col (+ colnum 1)))
 
-        (gnc:html-markup-p
-         (gnc:html-markup/format
-          (_ "The date and time option is %s.")
-          (gnc:html-markup-b date-string2)))
+      ;; prepend 2 empty rows
+      (gnc:html-table-prepend-row! html-table '())
+      (gnc:html-table-prepend-row! html-table '())
 
-        (gnc:html-markup-p
-         (gnc:html-markup/format
-          (_ "The relative date option is %s.")
-          (gnc:html-markup-b rel-date-string)))
+      ;; make the column headers
+      (while (not (= (length column-list) 0))
+	    (let* ((col-info (car column-list)))
+		  (cond
+		    ((equal? col-info '(quote total))
+               (gnc:html-table-set-cell!
+                html-table 0 (if show-diff? (+ current-col 1) current-col) "Total")
+            )
+		    ((list? col-info)
+               (gnc:html-table-set-cell!
+                html-table 0 (if show-diff? (+ current-col 1) current-col) "Multiple periods")
+		    )
+		    (else
+             (let* ((date (gnc-budget-get-period-start-date budget col-info)))
+               (gnc:html-table-set-cell!
+                html-table 0 (if show-diff? (+ current-col 1) current-col) (gnc-print-date date))
+               )
+		    )
+		  )
+          (if show-budget?
+            (begin
+              (gnc:html-table-set-cell!  html-table 1
+               current-col (_ "Bgt")) ;; Translators: Abbreviation for "Budget"
+              (set! current-col (+ current-col 1))
+            )
+          )
+          (if show-actual?
+            (begin
+              (gnc:html-table-set-cell!  html-table 1
+               current-col (_ "Act")) ;; Translators: Abbreviation for "Actual"
+              (set! current-col (+ current-col 1))
+            )
+          )
+          (if show-diff?
+            (begin
+              (gnc:html-table-set-cell!  html-table 1
+               current-col (_ "Diff")) ;; Translators: Abbrevation for "Difference"
+              (set! current-col (+ current-col 1))
+            )
+          )
+	      (set! column-list (cdr column-list))
+        )
+      )
+    )
+  )
 
-        (gnc:html-markup-p
-         (gnc:html-markup/format
-          (_ "The combination date option is %s.")
-          (gnc:html-markup-b combo-date-string)))
+  ;; Returns a list of the numbers between 0 and n
+  ;;
+  ;; Parameters:
+  ;;   n - Highest number
+  (define (0-to-n n)
+    (cond
+      ((= n 0) '(0))
+      (else (append (0-to-n (- n 1)) (list n)))
+    )
+  )
 
-        (gnc:html-markup-p
-         (gnc:html-markup/format
-          (_ "The number option is %s.")
-          (gnc:html-markup-b (number->string num-val))))
+  (let* ((num-rows (gnc:html-acct-table-num-rows acct-table))
+         (rownum 0)
+		 (column-info-list
+           (list budget-period-num (0-to-n budget-period-num) (0-to-n 11)))
+         (numcolumns (gnc:html-table-num-columns html-table))
+	 ;;(html-table (or html-table (gnc:make-html-table)))
+         ;; WARNING: we implicitly depend here on the details of
+         ;; gnc:html-table-add-account-balances.  Specifically, we
+         ;; assume that it makes twice as many columns as it uses for
+          ;; account labels.  For now, that seems to be a valid
+         ;; assumption.
+         (colnum (quotient numcolumns 2))
 
-        ;; Here we print the value of the number option formatted as
-        ;; currency. When printing currency values, you should use
-        ;; the function (xaccPrintAmount), which is defined in
-        ;; report-utilities. This functions will format the number
-        ;; appropriately in the current locale. Don't try to format
-        ;; it yourself -- it will be wrong in other locales.
-        (gnc:html-markup-p
-         (gnc:html-markup/format
-          (_ "The number option formatted as currency is %s.")
-          (gnc:html-markup-b
-           (xaccPrintAmount
-            (gnc:make-gnc-numeric (inexact->exact num-val) 1)
-            (gnc-default-print-info #f)))))))
+	 )
 
-      ;; you can add as many objects as you want.  Here's another
-      ;; one.  We'll make a single-column table of the selected list
-      ;; options just for grins.
-      (gnc:html-document-add-object!
-       document
-       (gnc:make-html-text
-        (gnc:html-markup-p (_ "Items you selected:"))))
+    ''(display (list "colnum: " colnum  "numcolumns: " numcolumns))
+    ;; call gnc:html-table-add-budget-line! for each account
+    (while (< rownum num-rows)
+           (let* ((env (append
+			(gnc:html-acct-table-get-row-env acct-table rownum)
+			params))
+                  (acct (get-val env 'account))
+                  (exchange-fn (get-val env 'exchange-fn))
+                  )
+             (gnc:html-table-add-budget-line!
+              html-table rownum colnum
+              budget acct column-info-list exchange-fn)
+             (set! rownum (+ rownum 1)) ;; increment rownum
+             )
+           ) ;; end of while
 
-      (if (not (null? list-val))
-          (let ((table (gnc:make-html-table)))
-            (gnc:html-table-append-column!
-             table (map symbol->string list-val))
-            (gnc:html-table-set-caption! table
-                                         (_ "List items selected"))
-            (gnc:html-document-add-object! document table))
-          (let ((txt (gnc:make-html-text)))
-            (gnc:html-text-append!
-             txt
-             (gnc:html-markup-p (_ "(You selected no list items.)")))
-            (gnc:html-document-add-object! document txt)))
+    ;; column headers
+    (gnc:html-table-add-budget-headers! html-table colnum budget column-info-list)
 
-      ;; here's a bullet list of accounts.  We can mark up the
-      ;; account name with an <a></a> anchor with a special HREF to
-      ;; open a Gnucash register when the link is clicked.  What you
-      ;; need to do is pass the HREF "gnc-register:account=My
-      ;; Account Name" to html-markup-anchor.  The account name
-      ;; passed must be the "full" account name that you get from
-      ;; gnc-account-get-full-name.  You should build this url using
-      ;; (gnc-build-url ...)
-      ;;
-      ;; html-markup-anchor takes the link to jump to as its first
-      ;; arg and then puts the remaining args in the body of the
-      ;; link).
-      ;;
-      ;; html-markup-ul makes a "<ul>" unnumbered list, and takes as
-      ;; its one argument a list of items to put in <li> blocks.
-      (if (not (null? accounts))
-          (gnc:html-document-add-object!
-           document
-           (gnc:make-html-text
-            (gnc:html-markup-ul
-             (map
-              (lambda (acct)
-                (gnc:html-markup-anchor
-		 (gnc-build-url URL-TYPE-REGISTER
-				     (string-append "account="
-						    (gnc-account-get-full-name
-						     acct))
-				     "")
-                 (xaccAccountGetName acct)))
-              accounts))))
-          (gnc:html-document-add-object!
-           document
-           (gnc:make-html-text
-            (gnc:html-markup-p (_ "You have selected no accounts.")))))
+    )
+    )
+  ) ;; end of define
 
-      (gnc:html-document-add-object!
-       document
-       (gnc:make-html-text
-        (gnc:html-markup-anchor (gnc-build-url URL-TYPE-HELP "gnucash-guide" "") (_ "Display help"))))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; renderer
+;; set up the document and add the table
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-      (gnc:html-document-add-object!
-       document
-       (gnc:make-html-text
-        (gnc:html-markup-p (_ "Have a nice day!"))))
+(define (renderer report-obj)
+  (define (get-option pagename optname)
+    (gnc:option-value
+     (gnc:lookup-option
+      (gnc:report-options report-obj) pagename optname)))
 
-      document)))
+  (gnc:report-starting reportname)
+
+  ;; get all option's values
+  (let* ((budget (get-option gnc:pagename-general optname-budget))
+         (budget-valid? (and budget (not (null? budget))))
+         (display-depth (get-option gnc:pagename-accounts
+                                    optname-display-depth))
+         (show-subaccts? (get-option gnc:pagename-accounts
+                                     optname-show-subaccounts))
+         (accounts (get-option gnc:pagename-accounts
+                               optname-accounts))
+	     (bottom-behavior (get-option gnc:pagename-accounts optname-bottom-behavior))
+         (budget-period-num (- (inexact->exact (get-option gnc:pagename-general optname-period)) 1))
+         (row-num 0) ;; ???
+         (work-done 0)
+         (work-to-do 0)
+         ;;(report-currency (get-option gnc:pagename-general
+         ;;                             optname-report-currency))
+         (show-full-names? (get-option gnc:pagename-general
+                                       optname-show-full-names))
+         (doc (gnc:make-html-document))
+         ;;(table (gnc:make-html-table))
+         ;;(txt (gnc:make-html-text))
+         )
+
+    ;; is account in list of accounts?
+    (define (same-account? a1 a2)
+      (string=? (gncAccountGetGUID a1) (gncAccountGetGUID a2)))
+
+    (define (same-split? s1 s2)
+      (string=? (gncSplitGetGUID s1) (gncSplitGetGUID s2)))
+
+    (define account-in-list?
+      (lambda (account accounts)
+        (cond
+          ((null? accounts) #f)
+          ((same-account? (car accounts) account) #t)
+          (else (account-in-list? account (cdr accounts))))))
+
+    (define split-in-list?
+      (lambda (split splits)
+	(cond
+	 ((null? splits) #f)
+	 ((same-split? (car splits) split) #t)
+	 (else (split-in-list? split (cdr splits))))))
+
+    (define account-in-alist
+      (lambda (account alist)
+        (cond
+	   ((null? alist) #f)
+           ((same-account? (caar alist) account) (car alist))
+           (else (account-in-alist account (cdr alist))))))
+
+    ;; helper for sorting of account list
+    (define (account-full-name<? a b)
+      (string<? (gnc-account-get-full-name a) (gnc-account-get-full-name b)))
+
+    ;; helper for account depth
+    (define (accounts-get-children-depth accounts)
+      (apply max
+	     (map (lambda (acct)
+		    (let ((children (gnc-account-get-children acct)))
+		      (if (null? children)
+			  1
+			  (+ 1 (accounts-get-children-depth children)))))
+		  accounts)))
+    ;; end of defines
+
+    ;; add subaccounts if requested
+    (if show-subaccts?
+        (let ((sub-accounts (gnc:acccounts-get-all-subaccounts accounts)))
+          (for-each
+            (lambda (sub-account)
+              (if (not (account-in-list? sub-account accounts))
+                  (set! accounts (append accounts sub-accounts))))
+            sub-accounts)))
+
+    (cond
+      ((null? accounts)
+        ;; No accounts selected.
+        (gnc:html-document-add-object!
+         doc
+         (gnc:html-make-no-account-warning
+	  reportname (gnc:report-id report-obj))))
+      ((not budget-valid?)
+        ;; No budget selected.
+        (gnc:html-document-add-object!
+          doc (gnc:html-make-generic-budget-warning reportname)))
+      (else (begin
+        (let* ((tree-depth (if (equal? display-depth 'all)
+                               (accounts-get-children-depth accounts)
+                               display-depth))
+               ;;(account-disp-list '())
+
+               ;; Things seem to crash if I don't set 'end-date to
+               ;; _something_ but the actual value isn't used.
+               (env (list (list 'end-date (gnc:get-today))
+                          (list 'display-tree-depth tree-depth)
+		 				  (list 'depth-limit-behavior
+						             (if bottom-behavior 'flatten 'summarize))
+                          ))
+               (acct-table #f)
+               (html-table (gnc:make-html-table))
+               (params '())
+               (paramsBudget
+                (list
+                 (list 'show-actual
+                       (get-option gnc:pagename-display optname-show-actual))
+                 (list 'show-budget
+                       (get-option gnc:pagename-display optname-show-budget))
+                 (list 'show-difference
+                       (get-option gnc:pagename-display optname-show-difference))
+                 (list 'show-totalcol
+                       (get-option gnc:pagename-display optname-show-totalcol))
+                 (list 'period-number budget-period-num)
+                )
+               )
+               (report-name (get-option gnc:pagename-general
+                                        gnc:optname-reportname))
+               )
+
+          (gnc:html-document-set-title!
+           doc (sprintf #f (_ "%s: %s")
+                        report-name (gnc-budget-get-name budget)))
+
+          (set! accounts (sort accounts account-full-name<?))
+
+          (set! acct-table
+                (gnc:make-html-acct-table/env/accts env accounts))
+
+          ;; We do this in two steps: First the account names...  the
+          ;; add-account-balances will actually compute and add a
+          ;; bunch of current account balances, too, but we'll
+          ;; overwrite them.
+          (set! html-table (gnc:html-table-add-account-balances
+                            #f acct-table params))
+
+          ;; ... then the budget values
+          (gnc:html-table-add-budget-values!
+           html-table acct-table budget paramsBudget)
+
+          ;; hmmm... I expected that add-budget-values would have to
+          ;; clear out any unused columns to the right, out to the
+          ;; table width, since the add-account-balance had put stuff
+          ;; there, but it doesn't seem to matter.
+
+          (gnc:html-document-add-object! doc html-table))))
+      ) ;; end cond
+
+    (gnc:report-finished)
+    doc))
 
 ;; Here we define the actual report with gnc:define-report
 (gnc:define-report
@@ -475,7 +679,7 @@ new, totally cool report, consult the mailing list %s.")
  ;; The name of this report. This will be used, among other things,
  ;; for making its menu item in the main menu. You need to use the
  ;; untranslated value here!
- 'name (N_ "PSL Budget")
+ 'name reportname
 
  ;; The GUID for this report. This string should be unique, set once
  ;; and left alone forever after that. In theory, you could use any
@@ -490,7 +694,7 @@ new, totally cool report, consult the mailing list %s.")
 
  ;; A tip that is used to provide additional information about the
  ;; report to the user.
- 'menu-tip (N_ "Used for teh monthly board meeting.")
+ 'menu-tip (N_ "Used for the monthly board meeting.")
 
  ;; A path describing where to put the report in the menu system.
  ;; In this case, it's going under the utility menu.
@@ -500,4 +704,4 @@ new, totally cool report, consult the mailing list %s.")
  'options-generator options-generator
 
  ;; The rendering function defined above.
- 'renderer hello-world-renderer)
+ 'renderer renderer)

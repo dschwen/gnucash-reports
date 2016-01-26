@@ -9,6 +9,16 @@
 (use-modules (gnucash gnc-module))
 (use-modules (gnucash gettext))
 
+;; 'debug is deprecated and unused since guile 2
+(cond-expand
+  (guile-2 )
+  (else
+    (debug-enable 'debug)))
+(debug-enable 'backtrace)
+
+(gnc:module-load "gnucash/report/report-system" 0)
+(gnc:module-load "gnucash/html" 0) ;for gnc-build-url
+
 (define reportname (N_ "YTD Budget Report"))
 
 ;; define all option's names so that they are properly defined

@@ -9,6 +9,8 @@
 (use-modules (gnucash gnc-module))
 (use-modules (gnucash gettext))
 
+(use-modules (gnucash printf))
+
 ;; 'debug is deprecated and unused since guile 2
 (cond-expand
   (guile-2 )
@@ -158,14 +160,14 @@
   ;; Return value:
   ;;   budget value to use for account for specified period.
   (define (budget-account-sum budget children period)
-	(let* ((sum (cond
+    (let* ((sum (cond
                    ((null? children) (gnc-numeric-zero))
                    (else (gnc-numeric-add (gnc:get-account-period-budget-value budget (car children) period)
                              (budget-account-sum budget (cdr children) period)
-			     GNC-DENOM-AUTO GNC-RND-ROUND))
+                 GNC-DENOM-AUTO GNC-RND-ROUND))
                  )
-		  ))
-	sum)
+          ))
+    sum)
   )
 
   ;; Calculate the value to use for the budget of an account for a specific period.
@@ -185,8 +187,8 @@
           (children (gnc-account-get-children acct))
           (amount (cond
                     (bgt-set? (gnc-budget-get-account-period-value budget acct period))
-		    ((not (null? children)) (budget-account-sum budget children period))
-		    (else (gnc-numeric-zero)))
+            ((not (null? children)) (budget-account-sum budget children period))
+            (else (gnc-numeric-zero)))
           ))
     amount)
   )
@@ -205,11 +207,11 @@
   (define (gnc:get-account-periodlist-budget-value budget acct periodlist)
 (gnc:debug "gnc:get-account-periodlist-budget-value " periodlist)
     (cond
-	  ((= (length periodlist) 1)(gnc:get-account-period-budget-value budget acct (car periodlist)))
-	  (else (gnc-numeric-add (gnc:get-account-period-budget-value budget acct (car periodlist))
-	                         (gnc:get-account-periodlist-budget-value budget acct (cdr periodlist))
-							 GNC-DENOM-AUTO GNC-RND-ROUND))
-	)
+      ((= (length periodlist) 1)(gnc:get-account-period-budget-value budget acct (car periodlist)))
+      (else (gnc-numeric-add (gnc:get-account-period-budget-value budget acct (car periodlist))
+                             (gnc:get-account-periodlist-budget-value budget acct (cdr periodlist))
+                             GNC-DENOM-AUTO GNC-RND-ROUND))
+    )
   )
 
   ;; Calculate the value to use for the actual of an account for a specific set of periods.
@@ -225,11 +227,11 @@
   (define (gnc:get-account-periodlist-actual-value budget acct periodlist)
 (gnc:debug "gnc:get-account-periodlist-actual-value " periodlist)
     (cond
-	  ((= (length periodlist) 1)(gnc-budget-get-account-period-actual-value budget acct (car periodlist)))
-	  (else (gnc-numeric-add (gnc-budget-get-account-period-actual-value budget acct (car periodlist))
-	                         (gnc:get-account-periodlist-actual-value budget acct (cdr periodlist))
-							 GNC-DENOM-AUTO GNC-RND-ROUND))
-	)
+      ((= (length periodlist) 1)(gnc-budget-get-account-period-actual-value budget acct (car periodlist)))
+      (else (gnc-numeric-add (gnc-budget-get-account-period-actual-value budget acct (car periodlist))
+                             (gnc:get-account-periodlist-actual-value budget acct (cdr periodlist))
+                             GNC-DENOM-AUTO GNC-RND-ROUND))
+    )
   )
 
   ;; Adds a line to tbe budget report.  The line contains a number of columns, controlled by the
@@ -252,9 +254,9 @@
     (let* ((num-periods (gnc-budget-get-num-periods budget))
            (period 0)
            (current-col (+ colnum 1))
-		   (bgt-total (gnc-numeric-zero))
-		   (bgt-total-unset? #t)
-		   (act-total (gnc-numeric-zero))
+           (bgt-total (gnc-numeric-zero))
+           (bgt-total-unset? #t)
+           (act-total (gnc-numeric-zero))
            (comm (xaccAccountGetCommodity acct))
            (reverse-balance? (gnc-reverse-balance acct))
            )
@@ -268,21 +270,21 @@
           (member type (list ACCT-TYPE-INCOME ACCT-TYPE-ASSET))))
 
 
-	  ;; Displays a set of budget column values.  The execution
+      ;; Displays a set of budget column values.  The execution
       ;; environment must include show-budget? show-actual? and
       ;; show-diff? to indicate which columns in the set should
       ;; be shown.
-	  ;;
-	  ;; Parameters
+      ;;
+      ;; Parameters
       ;;   html-table - html table being created
       ;;   rownum - row number
       ;;   acct - account
-	  ;;   bgt-numeric-val - budget value
-	  ;;   act-numeric-val - actual value
-	  ;;   dif-numeric val - difference value
-	  (define (gnc:html-table-display-budget-columns!
-	           html-table rownum acct
-			   bgt-numeric-val act-numeric-val dif-numeric-val)
+      ;;   bgt-numeric-val - budget value
+      ;;   act-numeric-val - actual value
+      ;;   dif-numeric val - difference value
+      (define (gnc:html-table-display-budget-columns!
+               html-table rownum acct
+               bgt-numeric-val act-numeric-val dif-numeric-val)
 
            (let* (
               (bgt-val #f)
@@ -292,7 +294,7 @@
               (inc-asset? (gnc:account-is-inc-asset? acct))
               (style-tag-neg (string-append style-tag "-neg"))
 
-			)
+            )
            (if show-budget?
              (begin
                (set! bgt-val (if (gnc-numeric-zero-p bgt-numeric-val)
@@ -334,21 +336,21 @@
                (set! current-col (+ current-col 1))
              )
            )
-		  )
-		)
+          )
+        )
 
-	  ;; Adds a set of column values to the budget report for a specific list
-	  ;; of periods.
-	  ;;
-	  ;; Parameters:
+      ;; Adds a set of column values to the budget report for a specific list
+      ;; of periods.
+      ;;
+      ;; Parameters:
       ;;   html-table - html table being created
       ;;   rownum - row number
       ;;   budget - budget to use
       ;;   acct - account being displayed
-	  ;;   period-list - list of periods to use
+      ;;   period-list - list of periods to use
       (define (gnc:html-table-add-budget-line-columns!
-	  			html-table rownum
-				budget acct period-list)
+                  html-table rownum
+                budget acct period-list)
              (let* (
                     ;; budgeted amount
                     (bgt-numeric-val (gnc:get-account-periodlist-budget-value
@@ -367,41 +369,41 @@
                                  (+ GNC-DENOM-LCD GNC-RND-NEVER)))
                     )
 
-			   (if (not (gnc-numeric-zero-p bgt-numeric-val))
-			     (begin
-			   		(set! bgt-total (gnc-numeric-add bgt-total bgt-numeric-val GNC-DENOM-AUTO GNC-RND-ROUND))
-					(set! bgt-total-unset? #f))
-				 )
-			   (set! act-total (gnc-numeric-add act-total act-numeric-val GNC-DENOM-AUTO GNC-RND-ROUND))
-	           (gnc:html-table-display-budget-columns!
-	               html-table rownum acct
-			       bgt-numeric-val act-numeric-val dif-numeric-val)
+               (if (not (gnc-numeric-zero-p bgt-numeric-val))
+                 (begin
+                       (set! bgt-total (gnc-numeric-add bgt-total bgt-numeric-val GNC-DENOM-AUTO GNC-RND-ROUND))
+                    (set! bgt-total-unset? #f))
+                 )
+               (set! act-total (gnc-numeric-add act-total act-numeric-val GNC-DENOM-AUTO GNC-RND-ROUND))
+               (gnc:html-table-display-budget-columns!
+                   html-table rownum acct
+                   bgt-numeric-val act-numeric-val dif-numeric-val)
              )
       )
 
       (while (not (null? column-list))
-	    (let* ((col-info (car column-list)))
-		  (cond
-		    ((equal? col-info '(quote total))
-	           (gnc:html-table-display-budget-columns!
-	               html-table rownum acct
-		           bgt-total act-total
+        (let* ((col-info (car column-list)))
+          (cond
+            ((equal? col-info '(quote total))
+               (gnc:html-table-display-budget-columns!
+                   html-table rownum acct
+                   bgt-total act-total
                    (gnc-numeric-sub bgt-total
                       act-total GNC-DENOM-AUTO
                       (+ GNC-DENOM-LCD GNC-RND-NEVER)
                    )
-	            ))
-		    ((list? col-info)
+                ))
+            ((list? col-info)
                 (gnc:html-table-add-budget-line-columns!
-	  		      	html-table rownum
-				      budget acct col-info))
-		    (else
+                        html-table rownum
+                      budget acct col-info))
+            (else
                 (gnc:html-table-add-budget-line-columns!
-	  		      	html-table rownum
-				      budget acct (list col-info)))
-		    )
-	      (set! column-list (cdr column-list))
-		)
+                        html-table rownum
+                      budget acct (list col-info)))
+            )
+          (set! column-list (cdr column-list))
+        )
      )
     )
   )
@@ -424,37 +426,44 @@
 
       ;; make the column headers
       (while (not (= (length column-list) 0))
-	    (let* ((col-info (car column-list)))
-		  (cond
-		    ((equal? col-info '(quote total))
+        (let* ((col-info (car column-list)))
+          (cond
+            ((equal? col-info '(quote total))
                (gnc:html-table-set-cell!
                 html-table 0 (if show-diff? (+ current-col 1) current-col) "Total")
             )
-		    ((list? col-info)
+            ((list? col-info)
                (gnc:html-table-set-cell!
-                html-table 0 (if show-diff? (+ current-col 1) current-col) "Multiple periods")
-		    )
-		    (else
+                 html-table 0 (if show-diff? (+ current-col 1) current-col)
+                   ;; if the column represents 12 budget periods it is assumed to be the yearly total
+                   ;; otherwise it is the "year to date" (YTD)
+                   (if (= (length col-info) 12) "Total" "YTD")
+               )
+            )
+            (else
              (let* ((date (gnc-budget-get-period-start-date budget col-info)))
                (gnc:html-table-set-cell!
                 html-table 0 (if show-diff? (+ current-col 1) current-col) (gnc-print-date date))
                )
-		    )
-		  )
+            )
+          )
+
           (if show-budget?
             (begin
               (gnc:html-table-set-cell!  html-table 1
-               current-col (_ "Bgt")) ;; Translators: Abbreviation for "Budget"
+               current-col (_ "Budget"))
               (set! current-col (+ current-col 1))
             )
           )
+
           (if show-actual?
             (begin
               (gnc:html-table-set-cell!  html-table 1
-               current-col (_ "Act")) ;; Translators: Abbreviation for "Actual"
+               current-col (_ "Actual"))
               (set! current-col (+ current-col 1))
             )
           )
+
           (if show-diff?
             (begin
               (gnc:html-table-set-cell!  html-table 1
@@ -462,7 +471,8 @@
               (set! current-col (+ current-col 1))
             )
           )
-	      (set! column-list (cdr column-list))
+
+          (set! column-list (cdr column-list))
         )
       )
     )
@@ -481,10 +491,10 @@
 
   (let* ((num-rows (gnc:html-acct-table-num-rows acct-table))
          (rownum 0)
-		 (column-info-list
+         (column-info-list
            (list budget-period-num (0-to-n budget-period-num) (0-to-n 11)))
          (numcolumns (gnc:html-table-num-columns html-table))
-	 ;;(html-table (or html-table (gnc:make-html-table)))
+     ;;(html-table (or html-table (gnc:make-html-table)))
          ;; WARNING: we implicitly depend here on the details of
          ;; gnc:html-table-add-account-balances.  Specifically, we
          ;; assume that it makes twice as many columns as it uses for
@@ -492,14 +502,14 @@
          ;; assumption.
          (colnum (quotient numcolumns 2))
 
-	 )
+     )
 
     ''(display (list "colnum: " colnum  "numcolumns: " numcolumns))
     ;; call gnc:html-table-add-budget-line! for each account
     (while (< rownum num-rows)
            (let* ((env (append
-			(gnc:html-acct-table-get-row-env acct-table rownum)
-			params))
+            (gnc:html-acct-table-get-row-env acct-table rownum)
+            params))
                   (acct (get-val env 'account))
                   (exchange-fn (get-val env 'exchange-fn))
                   )
@@ -539,7 +549,7 @@
                                      optname-show-subaccounts))
          (accounts (get-option gnc:pagename-accounts
                                optname-accounts))
-	     (bottom-behavior (get-option gnc:pagename-accounts optname-bottom-behavior))
+         (bottom-behavior (get-option gnc:pagename-accounts optname-bottom-behavior))
          (budget-period-num (- (inexact->exact (get-option gnc:pagename-general optname-period)) 1))
          (row-num 0) ;; ???
          (work-done 0)
@@ -569,15 +579,15 @@
 
     (define split-in-list?
       (lambda (split splits)
-	(cond
-	 ((null? splits) #f)
-	 ((same-split? (car splits) split) #t)
-	 (else (split-in-list? split (cdr splits))))))
+    (cond
+     ((null? splits) #f)
+     ((same-split? (car splits) split) #t)
+     (else (split-in-list? split (cdr splits))))))
 
     (define account-in-alist
       (lambda (account alist)
         (cond
-	   ((null? alist) #f)
+       ((null? alist) #f)
            ((same-account? (caar alist) account) (car alist))
            (else (account-in-alist account (cdr alist))))))
 
@@ -588,12 +598,12 @@
     ;; helper for account depth
     (define (accounts-get-children-depth accounts)
       (apply max
-	     (map (lambda (acct)
-		    (let ((children (gnc-account-get-children acct)))
-		      (if (null? children)
-			  1
-			  (+ 1 (accounts-get-children-depth children)))))
-		  accounts)))
+         (map (lambda (acct)
+            (let ((children (gnc-account-get-children acct)))
+              (if (null? children)
+              1
+              (+ 1 (accounts-get-children-depth children)))))
+          accounts)))
     ;; end of defines
 
     ;; add subaccounts if requested
@@ -611,7 +621,7 @@
         (gnc:html-document-add-object!
          doc
          (gnc:html-make-no-account-warning
-	  reportname (gnc:report-id report-obj))))
+      reportname (gnc:report-id report-obj))))
       ((not budget-valid?)
         ;; No budget selected.
         (gnc:html-document-add-object!
@@ -626,8 +636,8 @@
                ;; _something_ but the actual value isn't used.
                (env (list (list 'end-date (gnc:get-today))
                           (list 'display-tree-depth tree-depth)
-		 				  (list 'depth-limit-behavior
-						             (if bottom-behavior 'flatten 'summarize))
+                           (list 'depth-limit-behavior
+                                     (if bottom-behavior 'flatten 'summarize))
                           ))
                (acct-table #f)
                (html-table (gnc:make-html-table))
